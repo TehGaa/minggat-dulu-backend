@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Booking Service starting on :8082...")
+	fmt.Println("Booking Service starting on :8083...")
 
 	r := chi.NewRouter()
 
@@ -24,5 +24,5 @@ func main() {
 		})
 	})
 
-	log.Fatal(http.ListenAndServe(":8082", r))
+	log.Fatal(http.ListenAndServe(":8083", r))
 }
