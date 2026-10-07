@@ -1,0 +1,19 @@
+FROM golang:1.23-alpine AS builder
+WORKDIR /app
+
+# Download dependencies first (caches this layer to save Cloud Build minutes)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the monorepo and build the specific service
+COPY . .
+RUN go build -o /app/user-service ./cmd/user/main.go
+
+# Stage 2: The final tiny container deployed to Cloud Run
+FROM alpine:latest
+WORKDIR /root/
+COPY --from=builder /app/user-service .
+
+# Use the default Cloud Run port
+EXPOSE 8082
+CMD ["./user-service"]
