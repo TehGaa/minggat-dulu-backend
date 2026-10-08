@@ -5,30 +5,22 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
+	"minggat-dulu-backend/internal/pkg/config"
 	"minggat-dulu-backend/internal/pkg/database"
+	userHandler "minggat-dulu-backend/internal/user/handler"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-
-	userHandler "minggat-dulu-backend/internal/user/handler"
 )
 
 func main() {
 	fmt.Println("User Service starting on :8082...")
 
-	uri := os.Getenv("MONGODB_URI")
-	dbName := os.Getenv("MONGODB_DBNAME")
-	if uri == "" {
-		uri = "mongodb://root:password@localhost:27017"
-	}
-	if dbName == "" {
-		dbName = "minggat_dulu"
-	}
+	config := config.GetConfig()
 
-	client := database.GetMongoClient(uri)
-	userHandler := userHandler.NewUserHandler(client, dbName)
+	client := database.GetMongoClient(config.MongoURI)
+	userHandler := userHandler.NewUserHandler(client, config.DBName)
 
 	defer func() {
 		if err := client.Disconnect(context.Background()); err != nil {
