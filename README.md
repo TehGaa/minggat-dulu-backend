@@ -1,4 +1,4 @@
-# Minggat Dulu Backend
+# Minggat Dulu Backend (V 1.0.2-prealpha)
 
 This is the backend repository for the Minggat Dulu application, built with Go. It follows a microservices architecture using the standard Go project layout.
 
@@ -48,10 +48,10 @@ You can start the services locally by running the `main.go` files from the root 
 ```powershell
 go run cmd/user/main.go
 ```
-*(The user service runs on `:8081` with API routes under `/api/v1`)*
+*(The user service runs on `:8082` with API routes under `/api/v1`)*
 
 **Start the Booking Service:**
 ```powershell
 go run cmd/booking/main.go
 ```
-*(The booking service runs on `:8082` with API routes under `/api/v1`)*
+*(The booking service runs on `:8083` with API routes under `/api/v1`)*
