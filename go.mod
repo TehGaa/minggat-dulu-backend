@@ -5,6 +5,7 @@ go 1.27.1
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-chi/chi/v5 v5.3.2 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/rabbitmq/amqp091-go v1.15.0 // indirect
 	github.com/redis/go-redis/v9 v9.23.0 // indirect
