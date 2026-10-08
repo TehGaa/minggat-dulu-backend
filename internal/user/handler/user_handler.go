@@ -1,48 +1,70 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
-	"log"
+	"minggat-dulu-backend/internal/user/model"
+	"minggat-dulu-backend/internal/user/service"
 	"net/http"
-	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type UserHandler struct {
-	client  *mongo.Client
-	dbName  string
+	authService service.AuthService
+	userService service.UserService
 }
 
-func NewUserHandler(client *mongo.Client, dbName string) *UserHandler {
+func NewUserHandler(authService service.AuthService, userService service.UserService) *UserHandler {
 	return &UserHandler{
-		client:  client,
-		dbName:  dbName,
+		authService: authService,
+		userService: userService,
 	}
 }
 
-func (h *UserHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
-	userCollection := h.client.Database(h.dbName).Collection("users")
+func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 
-	// Create a new context from the request context with a 10 second timeout
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	var result []bson.M
-
-	cursor, err := userCollection.Find(ctx, bson.M{})
+	var loginRequest *model.LoginRequest
+	err := json.NewDecoder(r.Body).Decode(&loginRequest)
 	if err != nil {
-		log.Println(err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
 	}
 
-	err = cursor.All(ctx, &result)
-	if err != nil {
-		log.Println(err)
+	res := h.authService.Login(
+		r.Context(),
+		loginRequest.Email,
+		loginRequest.Password,
+	)
+
+	if res.AccessToken == "" {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(result)
+	json.NewEncoder(w).Encode(res)
+}
+
+func (h *UserHandler) GetUserByEmail(w http.ResponseWriter, r *http.Request) {
+
+	var body bson.M
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	email := body["email"].(string)
+
+	res := h.userService.GetUserByEmail(r.Context(), email)
+
+	if res == nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
 }
