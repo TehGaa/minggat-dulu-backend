@@ -23,7 +23,7 @@ func NewUserHandler(authService service.AuthService, userService service.UserSer
 
 func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 
-	var loginRequest *model.LoginRequest
+	var loginRequest model.LoginRequest
 	err := json.NewDecoder(r.Body).Decode(&loginRequest)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
