@@ -27,9 +27,10 @@ func main() {
 	userRepository := repository.NewUserRepository(mongodbClient, config, redisClient)
 	userService := service.NewUserService(userRepository)
 	authRepository := repository.NewAuthRepository(mongodbClient, config, redisClient)
-	authService := service.NewAuthService(authRepository, userRepository)
+	authService := service.NewAuthService(authRepository, userRepository, config)
 
-	userHandler := handler.NewUserHandler(authService, userService)
+	userHandler := handler.NewUserHandler(userService)
+	authHandler := handler.NewAuthHandler(authService)
 
 	defer func() {
 		if err := mongodbClient.Disconnect(context.Background()); err != nil {
@@ -52,7 +53,13 @@ func main() {
 
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-				userHandler.Login(w, r)
+				authHandler.Login(w, r)
+			})
+			r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.Register(w, r)
+			})
+			r.Post("/refresh", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.Refresh(w, r)
 			})
 		})
 

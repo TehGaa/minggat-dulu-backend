@@ -70,6 +70,21 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		var accessUUID string
+		uuidClaim, ok := claims["access_uuid"].(string)
+		if ok {
+			accessUUID = uuidClaim
+		} else {
+			http.Error(w, "Token payload missing access_uuid", http.StatusUnauthorized)
+			return
+		}
+
+		blacklisted, err := redisClient.Get(r.Context(), "auth:blacklist:"+accessUUID).Result()
+		if err == nil && blacklisted == "1" {
+			http.Error(w, "Token has been compromised", http.StatusUnauthorized)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }

@@ -14,9 +14,10 @@ import (
 )
 
 type UserRepository interface {
-	StoreEmail(ctx context.Context, userId, email string) error
 	DeleteEmail(ctx context.Context, userId, email string) error
 	GetUserByEmail(ctx context.Context, email string) bson.M
+	StoreUser(ctx context.Context, user bson.M) bool
+	CreateUser(ctx context.Context, email, password string) (bson.M, error)
 }
 
 type UserRepositoryImpl struct {
@@ -47,36 +48,7 @@ func (u *UserRepositoryImpl) GetUserByEmail(ctx context.Context, email string) b
 		return nil
 	}
 
-	oid, ok := result["_id"].(bson.ObjectID)
-	var userId string
-	if ok {
-		userId = oid.Hex()
-	} else {
-		userId = result["_id"].(string) // fallback in case it's actually a string
-	}
-
-	resultBytes, err := json.Marshal(result)
-	if err == nil {
-		err = u.r.Set(ctx, "user:"+userId, resultBytes, 24*time.Hour).Err()
-		if err != nil {
-			log.Println("Error storing user data in Redis:", err)
-		}
-	} else {
-		log.Println("Error marshaling user data for Redis:", err)
-	}
-
 	return result
-}
-
-func (u *UserRepositoryImpl) StoreEmail(ctx context.Context, userId, email string) error {
-
-	err := u.r.Set(ctx, "user:"+userId+":email", email, 24*time.Hour).Err()
-	if err != nil {
-		log.Println("Error storing email in Redis:", err)
-		return err
-	}
-
-	return nil
 }
 
 func (u *UserRepositoryImpl) DeleteEmail(ctx context.Context, userId, email string) error {
@@ -88,4 +60,42 @@ func (u *UserRepositoryImpl) DeleteEmail(ctx context.Context, userId, email stri
 	}
 
 	return nil
+}
+
+func (u *UserRepositoryImpl) StoreUser(ctx context.Context, user bson.M) bool {
+	oid, ok := user["_id"].(bson.ObjectID)
+	var userId string
+	if ok {
+		userId = oid.Hex()
+	} else {
+		userId = user["_id"].(string)
+	}
+	userBytes, err := json.Marshal(user)
+	if err != nil {
+		log.Println("Error marshaling user data:", err)
+		return false
+	}
+
+	err = u.r.Set(ctx, "user:"+userId, userBytes, 24*time.Hour).Err()
+	if err != nil {
+		log.Println("Error storing user in Redis:", err)
+		return false
+	}
+
+	return true
+}
+
+func (u *UserRepositoryImpl) CreateUser(ctx context.Context, email, password string) (bson.M, error) {
+	user := bson.M{
+		"email":    email,
+		"password": password,
+	}
+	res, err := u.client.Database(u.conf.DBName).Collection("users").InsertOne(ctx, user)
+	if err != nil {
+		log.Println("Error creating new user", err)
+		return nil, err
+	}
+	user["_id"] = res.InsertedID
+
+	return user, nil
 }
