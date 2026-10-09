@@ -1,4 +1,4 @@
-# Minggat Dulu Backend (V 1.0.2-prealpha)
+# Minggat Dulu Backend (V 1.1.0-prealpha)
 
 This is the backend repository for the Minggat Dulu application, built with Go. It follows a microservices architecture using the standard Go project layout.
 
