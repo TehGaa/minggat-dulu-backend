@@ -66,7 +66,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(customMiddleware.AuthMiddleware)
 			r.Route("/user", func(r chi.Router) {
-				r.Get("/", userHandler.GetUserByEmail)
+				r.Post("/", userHandler.GetUserByEmail)
 			})
 		})
 	})
