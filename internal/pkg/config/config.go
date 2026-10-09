@@ -2,17 +2,14 @@ package config
 
 import (
 	"os"
-	"strconv"
 	"sync"
 )
 
 type Config struct {
-	MongoURI      string
-	DBName        string
-	RedisAddr     string
-	RedisPassword string
-	RedisDB       int
-	JwtKey        string
+	MongoURI string
+	DBName   string
+	RedisUri string
+	JwtKey   string
 }
 
 var (
@@ -24,9 +21,8 @@ func GetConfig() *Config {
 	syncOnce.Do(func() {
 		mongoURI := os.Getenv("MONGODB_URI")
 		dbName := os.Getenv("MONGODB_DBNAME")
-		redisAddr := os.Getenv("REDIS_ADDR")
-		redisPassword := os.Getenv("REDIS_PASSWORD")
-		redisDB, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
+		redisUri := os.Getenv("REDIS_URI")
+		rabbitMQUri := os.Getenv("RABBITMQ_URI")
 		jwtKey := os.Getenv("JWT_KEY")
 		if mongoURI == "" {
 			mongoURI = "mongodb://root:password@localhost:27017"
@@ -34,23 +30,18 @@ func GetConfig() *Config {
 		if dbName == "" {
 			dbName = "minggat_dulu"
 		}
-		if redisAddr == "" {
-			redisAddr = "localhost:6379"
+		if redisUri == "" {
+			redisUri = "redis://localhost:6379/0"
 		}
-		if redisPassword == "" {
-			redisPassword = ""
-		}
-		if redisDB == 0 {
-			redisDB = 0
+		if rabbitMQUri == "" {
+			rabbitMQUri = "amqp://guest:guest@localhost:5672/"
 		}
 
 		config = &Config{
-			MongoURI:      mongoURI,
-			DBName:        dbName,
-			RedisAddr:     redisAddr,
-			RedisPassword: redisPassword,
-			RedisDB:       redisDB,
-			JwtKey:        jwtKey,
+			MongoURI: mongoURI,
+			DBName:   dbName,
+			RedisUri: redisUri,
+			JwtKey:   jwtKey,
 		}
 	})
 

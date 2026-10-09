@@ -23,7 +23,7 @@ func main() {
 	config := config.GetConfig()
 
 	mongodbClient := database.GetMongoClient(config.MongoURI)
-	redisClient := database.GetRedisClient(config.RedisAddr, config.RedisPassword, config.RedisDB)
+	redisClient := database.GetRedisClient(config.RedisUri)
 	userRepository := repository.NewUserRepository(mongodbClient, config, redisClient)
 	userService := service.NewUserService(userRepository)
 	authRepository := repository.NewAuthRepository(mongodbClient, config, redisClient)

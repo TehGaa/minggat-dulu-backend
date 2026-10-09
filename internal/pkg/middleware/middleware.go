@@ -26,7 +26,7 @@ var (
 func InitMiddleware() {
 	syncOnce.Do(func() {
 		conf = config.GetConfig()
-		redisClient = database.GetRedisClient(conf.RedisAddr, conf.RedisPassword, conf.RedisDB)
+		redisClient = database.GetRedisClient(conf.RedisUri)
 	})
 }
 

@@ -14,16 +14,17 @@ var (
 	syncOnce    sync.Once
 )
 
-func GetRedisClient(addr string, password string, db int) *redis.Client {
+func GetRedisClient(redisUri string) *redis.Client {
 	syncOnce.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		redisClient = redis.NewClient(&redis.Options{
-			Addr:     addr,
-			Password: password,
-			DB:       db,
-		})
+		opt, err := redis.ParseURL(redisUri)
+		if err != nil {
+			log.Fatalf("Failed to parse Redis URI: %v", err)
+		}
+
+		redisClient = redis.NewClient(opt)
 
 		if err := redisClient.Ping(ctx).Err(); err != nil {
 			log.Fatalf("Failed to connect to Redis: %v", err)
