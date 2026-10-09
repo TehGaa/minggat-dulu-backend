@@ -5,38 +5,42 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
+	"minggat-dulu-backend/internal/pkg/config"
 	"minggat-dulu-backend/internal/pkg/database"
+	customMiddleware "minggat-dulu-backend/internal/pkg/middleware"
+	"minggat-dulu-backend/internal/user/handler"
+	"minggat-dulu-backend/internal/user/repository"
+	"minggat-dulu-backend/internal/user/service"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-
-	userHandler "minggat-dulu-backend/internal/user/handler"
 )
 
 func main() {
 	fmt.Println("User Service starting on :8082...")
 
-	uri := os.Getenv("MONGODB_URI")
-	dbName := os.Getenv("MONGODB_DBNAME")
-	if uri == "" {
-		uri = "mongodb://root:password@localhost:27017"
-	}
-	if dbName == "" {
-		dbName = "minggat_dulu"
-	}
+	config := config.GetConfig()
 
-	client := database.GetMongoClient(uri)
-	userHandler := userHandler.NewUserHandler(client, dbName)
+	mongodbClient := database.GetMongoClient(config.MongoURI)
+	redisClient := database.GetRedisClient(config.RedisUri)
+	userRepository := repository.NewUserRepository(mongodbClient, config, redisClient)
+	userService := service.NewUserService(userRepository)
+	authRepository := repository.NewAuthRepository(mongodbClient, config, redisClient)
+	authService := service.NewAuthService(authRepository, userRepository, config)
+
+	userHandler := handler.NewUserHandler(userService)
+	authHandler := handler.NewAuthHandler(authService)
 
 	defer func() {
-		if err := client.Disconnect(context.Background()); err != nil {
+		if err := mongodbClient.Disconnect(context.Background()); err != nil {
 			log.Printf("Error disconnecting from MongoDB: %v", err)
 		}
 	}()
 
 	r := chi.NewRouter()
+
+	customMiddleware.InitMiddleware()
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -47,14 +51,22 @@ func main() {
 			w.Write([]byte("User Service OK"))
 		})
 
-		//TODO: add auth apis
 		r.Route("/auth", func(r chi.Router) {
-
+			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.Login(w, r)
+			})
+			r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.Register(w, r)
+			})
+			r.Post("/refresh", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.Refresh(w, r)
+			})
 		})
 
 		r.Group(func(r chi.Router) {
+			r.Use(customMiddleware.AuthMiddleware)
 			r.Route("/user", func(r chi.Router) {
-				r.Get("/", userHandler.GetUsers)
+				r.Get("/", userHandler.GetUserByEmail)
 			})
 		})
 	})
