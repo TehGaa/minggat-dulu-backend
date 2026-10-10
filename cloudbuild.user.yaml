@@ -1,0 +1,20 @@
+steps:
+# Step 1: Build the Docker image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'REGION-docker.pkg.dev/$PROJECT_ID/minggat-dulu-backend/minggat-dulu-user-service:$COMMIT_SHA', '-f', 'Dockerfile.user', '.']
+
+# Step 2: Push the image to Google Artifact Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'REGION-docker.pkg.dev/$PROJECT_ID/minggat-dulu-backend/minggat-dulu-user-service:$COMMIT_SHA']
+
+# Step 3: Deploy the image to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+  - 'run'
+  - 'deploy'
+  - 'minggat-dulu-backend-user-service'
+  - '--image'
+  - 'REGION-docker.pkg.dev/$PROJECT_ID/minggat-dulu-backend/minggat-dulu-user-service:$COMMIT_SHA'
+  - '--region'
+  - 'REGION'
