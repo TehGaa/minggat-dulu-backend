@@ -18,3 +18,6 @@ steps:
   - 'REGION-docker.pkg.dev/$PROJECT_ID/minggat-dulu-backend/minggat-dulu-user-service:$COMMIT_SHA'
   - '--region'
   - 'REGION'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
