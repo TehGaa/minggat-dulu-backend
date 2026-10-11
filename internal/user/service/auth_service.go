@@ -40,37 +40,42 @@ func NewAuthService(
 }
 
 func (a *authServiceImpl) Login(ctx context.Context, email string, password string) model.Token {
-	res := a.userRepository.GetUserByEmail(ctx, email)
+	user := a.userRepository.GetUserByEmail(ctx, email)
 
-	if res == nil {
+	if user == nil {
+		log.Println("Error getting user from Redis")
 		return model.Token{}
 	}
 
-	err := bcrypt.CompareHashAndPassword([]byte(res["password"].(string)), []byte(password))
+	err := bcrypt.CompareHashAndPassword([]byte(user["password"].(string)), []byte(password))
 
 	if err != nil {
+		log.Println("Error creating hashed password")
 		return model.Token{}
 	}
 
-	oid, ok := res["_id"].(bson.ObjectID)
+	oid, ok := user["_id"].(bson.ObjectID)
 	var userId string
 	if ok {
 		userId = oid.Hex()
 	} else {
-		userId = res["_id"].(string)
+		userId = user["_id"].(string)
 	}
 
-	token := a.authRepository.CreateToken(ctx, userId, email)
+	token := a.authRepository.CreateToken(ctx, userId, email, user)
 	if token.AccessToken == "" {
+		log.Println("Error creating token")
 		return model.Token{}
 	}
 
 	if !a.authRepository.StoreToken(ctx, token) {
+		log.Println("Error storing token into Redis")
 		return model.Token{}
 	}
 
-	if !a.userRepository.StoreUser(ctx, res) {
+	if !a.userRepository.StoreUser(ctx, user) {
 		a.authRepository.DeleteToken(ctx, userId, email)
+		log.Println("Error storing user in Redis")
 		return model.Token{}
 	}
 
@@ -106,7 +111,7 @@ func (a *authServiceImpl) Register(ctx context.Context, email, password string) 
 		userId = userIdStr
 	}
 
-	token := a.authRepository.CreateToken(ctx, userId, email)
+	token := a.authRepository.CreateToken(ctx, userId, email, user)
 	if token.AccessToken == "" {
 		return model.Token{}, errors.New("Error creating token")
 	}
@@ -151,6 +156,13 @@ func (a *authServiceImpl) Refresh(ctx context.Context, refreshToken string) mode
 		return model.Token{}
 	}
 
+	user := a.userRepository.GetUserByEmail(ctx, claims["email"].(string))
+
+	if user == nil {
+		log.Println("Error getting user from Redis")
+		return model.Token{}
+	}
+
 	if !a.authRepository.CheckTokenExist(ctx, userId, oldRefreshUUID) {
 		log.Println("Error getting token from Redis")
 		return model.Token{}
@@ -163,7 +175,7 @@ func (a *authServiceImpl) Refresh(ctx context.Context, refreshToken string) mode
 		return model.Token{}
 	}
 
-	newToken := a.authRepository.CreateToken(ctx, userId, userEmail)
+	newToken := a.authRepository.CreateToken(ctx, userId, userEmail, user)
 
 	if newToken.AccessToken == "" {
 		log.Println("Error creating token")
@@ -180,13 +192,7 @@ func (a *authServiceImpl) Refresh(ctx context.Context, refreshToken string) mode
 		return model.Token{}
 	}
 
-	res := a.userRepository.GetUserByEmail(ctx, claims["email"].(string))
-
-	if res == nil {
-		return model.Token{}
-	}
-
-	if !a.userRepository.StoreUser(ctx, res) {
+	if !a.userRepository.StoreUser(ctx, user) {
 		log.Println("Error storing user in Redis")
 		if !a.authRepository.DeleteToken(ctx, userId, claims["email"].(string)) {
 			log.Println("Error delete token in Redis")

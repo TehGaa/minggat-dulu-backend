@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/google/uuid"
@@ -19,7 +20,7 @@ import (
 type AuthRepository interface {
 	StoreToken(ctx context.Context, token model.Token) bool
 	DeleteToken(ctx context.Context, userId string, oldRefreshUUID string) bool
-	CreateToken(ctx context.Context, userId, email string) model.Token
+	CreateToken(ctx context.Context, userId, email string, user bson.M) model.Token
 	CheckTokenExist(ctx context.Context, userId string, oldRefreshUUID string) bool
 	BlacklistToken(ctx context.Context, userId string, oldRefreshUUID string) error
 }
@@ -71,7 +72,7 @@ func (a *authRepositoryImpl) DeleteToken(ctx context.Context, userId string, old
 	return true
 }
 
-func (a *authRepositoryImpl) CreateToken(ctx context.Context, userId, email string) model.Token {
+func (a *authRepositoryImpl) CreateToken(ctx context.Context, userId, email string, user bson.M) model.Token {
 
 	accessUUID := uuid.New().String()
 	refreshUUID := uuid.New().String()
@@ -100,7 +101,11 @@ func (a *authRepositoryImpl) CreateToken(ctx context.Context, userId, email stri
 	}
 
 	token := model.Token{
-		UserId:       userId,
+		UserId: userId,
+		UserData: bson.M{
+			"username": user["username"],
+			"avatar":   user["avatar"],
+		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		AccessUUID:   accessUUID,
