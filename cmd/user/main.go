@@ -55,6 +55,9 @@ func main() {
 			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
 				authHandler.Login(w, r)
 			})
+			r.Post("/logout", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.Logout(w, r)
+			})
 			r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
 				authHandler.Register(w, r)
 			})

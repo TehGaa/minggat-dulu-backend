@@ -16,6 +16,7 @@ import (
 
 type AuthService interface {
 	Login(ctx context.Context, email string, password string) model.Token
+	Logout(ctx context.Context, refreshToken string) error
 	Register(ctx context.Context, email, password string) (model.Token, error)
 	Refresh(ctx context.Context, refreshToken string) model.Token
 }
@@ -121,9 +122,9 @@ func (a *authServiceImpl) Register(ctx context.Context, email, password string) 
 	return token, nil
 }
 
-func (h *authServiceImpl) Refresh(ctx context.Context, refreshToken string) model.Token {
+func (a *authServiceImpl) Refresh(ctx context.Context, refreshToken string) model.Token {
 	oldRefreshToken, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
-		return []byte(h.conf.JwtKey), nil
+		return []byte(a.conf.JwtKey), nil
 	})
 	if err != nil {
 		log.Println("Invalid refresh token")
@@ -150,48 +151,91 @@ func (h *authServiceImpl) Refresh(ctx context.Context, refreshToken string) mode
 		return model.Token{}
 	}
 
-	if !h.authRepository.CheckTokenExist(ctx, userId, oldRefreshUUID) {
+	if !a.authRepository.CheckTokenExist(ctx, userId, oldRefreshUUID) {
 		log.Println("Error getting token from Redis")
 		return model.Token{}
 	}
 
-	err = h.authRepository.BlacklistToken(ctx, userId, oldRefreshUUID)
+	err = a.authRepository.BlacklistToken(ctx, userId, oldRefreshUUID)
 
 	if err != nil {
 		log.Println("Error blacklisting token in Redis")
 		return model.Token{}
 	}
 
-	newToken := h.authRepository.CreateToken(ctx, userId, userEmail)
+	newToken := a.authRepository.CreateToken(ctx, userId, userEmail)
 
 	if newToken.AccessToken == "" {
 		log.Println("Error creating token")
 		return model.Token{}
 	}
 
-	if !h.authRepository.DeleteToken(ctx, userId, oldRefreshUUID) {
+	if !a.authRepository.DeleteToken(ctx, userId, oldRefreshUUID) {
 		log.Println("Error deleting token in Redis")
 		return model.Token{}
 	}
 
-	if !h.authRepository.StoreToken(ctx, newToken) {
+	if !a.authRepository.StoreToken(ctx, newToken) {
 		log.Println("Error storing token in Redis")
 		return model.Token{}
 	}
 
-	res := h.userRepository.GetUserByEmail(ctx, claims["email"].(string))
+	res := a.userRepository.GetUserByEmail(ctx, claims["email"].(string))
 
 	if res == nil {
 		return model.Token{}
 	}
 
-	if !h.userRepository.StoreUser(ctx, res) {
+	if !a.userRepository.StoreUser(ctx, res) {
 		log.Println("Error storing user in Redis")
-		if !h.authRepository.DeleteToken(ctx, userId, claims["email"].(string)) {
+		if !a.authRepository.DeleteToken(ctx, userId, claims["email"].(string)) {
 			log.Println("Error delete token in Redis")
 		}
 		return model.Token{}
 	}
 
 	return newToken
+}
+
+func (a *authServiceImpl) Logout(ctx context.Context, refreshToken string) error {
+	oldRefreshToken, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		return []byte(a.conf.JwtKey), nil
+	})
+	if err != nil {
+		log.Println("Invalid refresh token")
+		return err
+	}
+
+	claims := oldRefreshToken.Claims.(jwt.MapClaims)
+
+	userId, ok := claims["_id"].(string)
+	if !ok {
+		log.Println("Invalid _id in claims")
+		return err
+	}
+
+	oldRefreshUUID, ok := claims["refresh_uuid"].(string)
+	if !ok {
+		log.Println("Invalid refresh_uuid in claims")
+		return err
+	}
+
+	if !a.authRepository.CheckTokenExist(ctx, userId, oldRefreshUUID) {
+		log.Println("Error getting token from Redis")
+		return err
+	}
+
+	err = a.authRepository.BlacklistToken(ctx, userId, oldRefreshUUID)
+
+	if err != nil {
+		log.Println("Error blacklisting token in Redis")
+		return err
+	}
+
+	if !a.authRepository.DeleteToken(ctx, userId, oldRefreshUUID) {
+		log.Println("Error deleting token in Redis")
+		return err
+	}
+
+	return nil
 }
