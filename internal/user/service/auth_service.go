@@ -271,7 +271,7 @@ func (a *authServiceImpl) LoginByGoogle(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	u := googleOauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	u := googleOauthConfig.AuthCodeURL(state, oauth2.SetAuthURLParam("prompt", "select_account"))
 	return u, nil
 }
 
