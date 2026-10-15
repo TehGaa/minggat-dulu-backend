@@ -203,7 +203,7 @@ func (a *authRepositoryImpl) StoreGoogleOauthTicket(ctx context.Context, ticket 
 		return false
 	}
 
-	err = a.r.Set(ctx, "google-ticket:"+ticket, tokenBytes, 24*time.Hour).Err()
+	err = a.r.Set(ctx, "google-ticket:"+ticket, tokenBytes, 60*time.Second).Err()
 	if err != nil {
 		return false
 	}
@@ -212,9 +212,14 @@ func (a *authRepositoryImpl) StoreGoogleOauthTicket(ctx context.Context, ticket 
 }
 
 func (a *authRepositoryImpl) RedeemGoogleOauthTicket(ctx context.Context, ticket string) (model.Token, error) {
-	tokenRaw, err := a.r.Get(ctx, "ticket:"+ticket).Result()
+	tokenRaw, err := a.r.Get(ctx, "google-ticket:"+ticket).Result()
 	if err != nil {
 		return model.Token{}, errors.New("Failed to get token")
+	}
+
+	err = a.r.Del(ctx, "google-ticket:"+ticket).Err()
+	if err != nil {
+		return model.Token{}, errors.New("Failed to delete ticket")
 	}
 
 	var token model.Token
