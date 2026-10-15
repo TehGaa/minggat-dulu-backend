@@ -30,7 +30,7 @@ func main() {
 	authService := service.NewAuthService(authRepository, userRepository, config)
 
 	userHandler := handler.NewUserHandler(userService)
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, config)
 
 	defer func() {
 		if err := mongodbClient.Disconnect(context.Background()); err != nil {
