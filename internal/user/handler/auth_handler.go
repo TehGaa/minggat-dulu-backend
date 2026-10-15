@@ -7,6 +7,7 @@ import (
 	"minggat-dulu-backend/internal/user/service"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -142,35 +143,43 @@ func (h *AuthHandler) LoginByGoogle(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) LoginByGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.URL.Query().Get("state")
 
-	token, err := h.authService.LoginByGoogleCallback(r.Context(), state, r.FormValue("code"))
+	ticket, err := h.authService.LoginByGoogleCallback(r.Context(), state, r.FormValue("code"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "access_token",
-		Value:    token.AccessToken,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   15 * 60,
-	})
+	callbackURL := strings.TrimRight(h.conf.OriginUrl, "/") +
+		"/api/auth/google/callback?ticket=" + url.QueryEscape(ticket)
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    token.RefreshToken,
-		Path:     "/api/v1/auth",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   24 * 60 * 60,
-	})
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
 
-	fragment := url.Values{}
-	fragment.Set("access_token", token.AccessToken)
-	fragment.Set("refresh_token", token.RefreshToken)
+	http.Redirect(w, r, callbackURL, http.StatusSeeOther)
+}
 
-	http.Redirect(w, r, h.conf.OriginUrl+"#"+fragment.Encode(), http.StatusSeeOther)
+func (h *AuthHandler) RedeemGoogleOauthTicket(w http.ResponseWriter, r *http.Request) {
+	var body map[string]string
+	err := json.NewDecoder(r.Body).Decode(&body)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ticket := body["ticket"]
+	if ticket == "" {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.authService.RedeemGoogleOauthTicket(r.Context(), ticket)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(token)
 }

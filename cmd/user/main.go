@@ -61,6 +61,9 @@ func main() {
 			r.Get("/google-oauth-callback", func(w http.ResponseWriter, r *http.Request) {
 				authHandler.LoginByGoogleCallback(w, r)
 			})
+			r.Post("/redeem-google-oauth-ticket", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.RedeemGoogleOauthTicket(w, r)
+			})
 			r.Post("/logout", func(w http.ResponseWriter, r *http.Request) {
 				authHandler.Logout(w, r)
 			})

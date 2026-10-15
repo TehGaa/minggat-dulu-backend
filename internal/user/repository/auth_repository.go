@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"minggat-dulu-backend/internal/pkg/config"
@@ -25,6 +26,8 @@ type AuthRepository interface {
 	BlacklistToken(ctx context.Context, userId string, oldRefreshUUID string) error
 	StoreGoogleOauthState(ctx context.Context, state string) error
 	CheckGoogleOauthStateExist(ctx context.Context, state string) bool
+	StoreGoogleOauthTicket(ctx context.Context, ticket string, token model.Token) bool
+	RedeemGoogleOauthTicket(ctx context.Context, ticket string) (model.Token, error)
 }
 
 type authRepositoryImpl struct {
@@ -191,4 +194,34 @@ func (a *authRepositoryImpl) CheckGoogleOauthStateExist(ctx context.Context, sta
 		return false
 	}
 	return true
+}
+
+func (a *authRepositoryImpl) StoreGoogleOauthTicket(ctx context.Context, ticket string, token model.Token) bool {
+
+	tokenBytes, err := json.Marshal(token)
+	if err != nil {
+		return false
+	}
+
+	err = a.r.Set(ctx, "google-ticket:"+ticket, tokenBytes, 24*time.Hour).Err()
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+func (a *authRepositoryImpl) RedeemGoogleOauthTicket(ctx context.Context, ticket string) (model.Token, error) {
+	tokenRaw, err := a.r.Get(ctx, "ticket:"+ticket).Result()
+	if err != nil {
+		return model.Token{}, errors.New("Failed to get token")
+	}
+
+	var token model.Token
+	err = json.Unmarshal([]byte(tokenRaw), &token)
+	if err != nil {
+		return model.Token{}, errors.New("Token is invalid")
+	}
+
+	return token, nil
 }

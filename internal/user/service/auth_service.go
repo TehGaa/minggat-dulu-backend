@@ -25,7 +25,8 @@ type AuthService interface {
 	Register(ctx context.Context, email, password string) (model.Token, error)
 	Refresh(ctx context.Context, refreshToken string) model.Token
 	LoginByGoogle(ctx context.Context) (string, error)
-	LoginByGoogleCallback(ctx context.Context, state, code string) (model.Token, error)
+	LoginByGoogleCallback(ctx context.Context, state, code string) (string, error)
+	RedeemGoogleOauthTicket(ctx context.Context, ticket string) (model.Token, error)
 }
 
 type authServiceImpl struct {
@@ -274,16 +275,16 @@ func (a *authServiceImpl) LoginByGoogle(ctx context.Context) (string, error) {
 	return u, nil
 }
 
-func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, state, code string) (model.Token, error) {
+func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, state, code string) (string, error) {
 	if !a.authRepository.CheckGoogleOauthStateExist(ctx, state) {
 		log.Println("Error exchange authorization code to token")
-		return model.Token{}, errors.New("Error getting google auth state")
+		return "", errors.New("Error getting google auth state")
 	}
 
 	token, err := a.conf.GoogleOauthConfig.Exchange(ctx, code)
 	if err != nil {
 		log.Println("Error exchange authorization code to token")
-		return model.Token{}, err
+		return "", err
 	}
 
 	req, err := http.NewRequestWithContext(
@@ -294,7 +295,7 @@ func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, state, code
 	)
 	if err != nil {
 		log.Println("Error creating request for google user info")
-		return model.Token{}, err
+		return "", err
 	}
 
 	client := a.conf.GoogleOauthConfig.Client(ctx, token)
@@ -302,21 +303,21 @@ func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, state, code
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("Error getting google user info")
-		return model.Token{}, err
+		return "", err
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Println("Error getting google user info")
-		return model.Token{}, errors.New("Error getting google user info")
+		return "", errors.New("Error getting google user info")
 	}
 
 	var data bson.M
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
 		log.Println("Error getting google user info response payload")
-		return model.Token{}, err
+		return "", err
 	}
 
 	email := data["email"].(string)
@@ -326,14 +327,14 @@ func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, state, code
 	if user == nil {
 		user, err = a.userRepository.CreateOauthUser(ctx, email, "google")
 		if err != nil {
-			return model.Token{}, err
+			return "", err
 		}
 	}
 
 	driver, exists := user["driver"]
 	if !exists || driver != "google" {
 		log.Println("Invalid login method")
-		return model.Token{}, errors.New("Invalid email driver")
+		return "", errors.New("Invalid email driver")
 	}
 
 	oid, ok := user["_id"].(bson.ObjectID)
@@ -347,21 +348,37 @@ func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, state, code
 	appToken := a.authRepository.CreateToken(ctx, userId, email, user)
 	if token.AccessToken == "" {
 		log.Println("Error creating token")
-		return model.Token{}, errors.New("Error creating token")
+		return "", errors.New("Error creating token")
 	}
 
 	if !a.authRepository.StoreToken(ctx, appToken) {
 		log.Println("Error storing token into Redis")
-		return model.Token{}, errors.New("Error storing token")
+		return "", errors.New("Error storing token")
 	}
 
 	if !a.userRepository.StoreUser(ctx, user) {
 		a.authRepository.DeleteToken(ctx, userId, email)
 		log.Println("Error storing user in Redis")
-		return model.Token{}, errors.New("Error storing user in Redis")
+		return "", errors.New("Error storing user in Redis")
 	}
 
-	return appToken, nil
+	ticket, err := generateTicket()
+	if err != nil {
+		log.Println("Error creating user ticket")
+		return "", errors.New("Error creating user ticket")
+	}
+
+	if !a.authRepository.StoreGoogleOauthTicket(ctx, ticket, appToken) {
+		log.Println("Error storing ticket into Redis")
+		return "", errors.New("Error storing token")
+	}
+
+	return ticket, nil
+}
+
+func (a *authServiceImpl) RedeemGoogleOauthTicket(ctx context.Context, ticket string) (model.Token, error) {
+	token, err := a.authRepository.RedeemGoogleOauthTicket(ctx, ticket)
+	return token, err
 }
 
 func randomValue(n int) (string, error) {
@@ -369,5 +386,14 @@ func randomValue(n int) (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func generateTicket() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
