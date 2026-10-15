@@ -16,6 +16,7 @@ type Config struct {
 	JwtKey            string
 	GoogleOauthConfig *oauth2.Config
 	OriginUrl         string
+	ApiKey            string
 }
 
 type GoogleOAuthCredentials struct {
@@ -32,11 +33,12 @@ var (
 func GetConfig() *Config {
 	syncOnce.Do(func() {
 		mongoURI := os.Getenv("MONGODB_URI")
-		dbName := os.Getenv("MONGODB_DBNAME")
+		dbName := "minggat_dulu"
 		redisUri := os.Getenv("REDIS_URI")
 		rabbitMQUri := os.Getenv("RABBITMQ_URI")
 		jwtKey := os.Getenv("JWT_KEY")
 		googleOauthConfigJson := os.Getenv("GOOGLE_OAUTH_SECRET")
+		apiKey := os.Getenv("API_KEY")
 		if mongoURI == "" {
 			mongoURI = "mongodb://root:password@localhost:27017"
 		}
@@ -48,6 +50,9 @@ func GetConfig() *Config {
 		}
 		if rabbitMQUri == "" {
 			rabbitMQUri = "amqp://guest:guest@localhost:5672/"
+		}
+		if apiKey == "" {
+			apiKey = "local"
 		}
 
 		var googleOauthConfig *oauth2.Config
@@ -78,6 +83,7 @@ func GetConfig() *Config {
 			JwtKey:            jwtKey,
 			GoogleOauthConfig: googleOauthConfig,
 			OriginUrl:         originUrl,
+			ApiKey:            apiKey,
 		}
 	})
 

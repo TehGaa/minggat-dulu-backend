@@ -45,40 +45,43 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("User Service OK"))
-		})
+	r.Group(func(r chi.Router) {
+		r.Use(customMiddleware.ApiMiddleware)
+		r.Route("/api/v1", func(r chi.Router) {
+			r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("User Service OK"))
+			})
 
-		r.Route("/auth", func(r chi.Router) {
-			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-				authHandler.Login(w, r)
+			r.Route("/auth", func(r chi.Router) {
+				r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+					authHandler.Login(w, r)
+				})
+				r.Get("/login-by-google", func(w http.ResponseWriter, r *http.Request) {
+					authHandler.LoginByGoogle(w, r)
+				})
+				r.Get("/google-oauth-callback", func(w http.ResponseWriter, r *http.Request) {
+					authHandler.LoginByGoogleCallback(w, r)
+				})
+				r.Post("/redeem-google-oauth-ticket", func(w http.ResponseWriter, r *http.Request) {
+					authHandler.RedeemGoogleOauthTicket(w, r)
+				})
+				r.Post("/logout", func(w http.ResponseWriter, r *http.Request) {
+					authHandler.Logout(w, r)
+				})
+				r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
+					authHandler.Register(w, r)
+				})
+				r.Post("/refresh", func(w http.ResponseWriter, r *http.Request) {
+					authHandler.Refresh(w, r)
+				})
 			})
-			r.Get("/login-by-google", func(w http.ResponseWriter, r *http.Request) {
-				authHandler.LoginByGoogle(w, r)
-			})
-			r.Get("/google-oauth-callback", func(w http.ResponseWriter, r *http.Request) {
-				authHandler.LoginByGoogleCallback(w, r)
-			})
-			r.Post("/redeem-google-oauth-ticket", func(w http.ResponseWriter, r *http.Request) {
-				authHandler.RedeemGoogleOauthTicket(w, r)
-			})
-			r.Post("/logout", func(w http.ResponseWriter, r *http.Request) {
-				authHandler.Logout(w, r)
-			})
-			r.Post("/register", func(w http.ResponseWriter, r *http.Request) {
-				authHandler.Register(w, r)
-			})
-			r.Post("/refresh", func(w http.ResponseWriter, r *http.Request) {
-				authHandler.Refresh(w, r)
-			})
-		})
 
-		r.Group(func(r chi.Router) {
-			r.Use(customMiddleware.AuthMiddleware)
-			r.Route("/user", func(r chi.Router) {
-				r.Post("/", userHandler.GetUserByEmail)
+			r.Group(func(r chi.Router) {
+				r.Use(customMiddleware.AuthMiddleware)
+				r.Route("/user", func(r chi.Router) {
+					r.Post("/", userHandler.GetUserByEmail)
+				})
 			})
 		})
 	})
