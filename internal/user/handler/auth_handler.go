@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"minggat-dulu-backend/internal/pkg/config"
 	"minggat-dulu-backend/internal/user/model"
 	"minggat-dulu-backend/internal/user/service"
 	"net/http"
@@ -11,11 +12,13 @@ import (
 
 type AuthHandler struct {
 	authService service.AuthService
+	conf        config.Config
 }
 
-func NewAuthHandler(authService service.AuthService) *AuthHandler {
+func NewAuthHandler(authService service.AuthService, conf config.Config) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		conf:        conf,
 	}
 }
 
@@ -136,12 +139,33 @@ func (h *AuthHandler) LoginByGoogle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) LoginByGoogleCallback(w http.ResponseWriter, r *http.Request) {
-	token, err := h.authService.LoginByGoogleCallback(r.Context(), r.FormValue("code"))
+	state := r.URL.Query().Get("state")
+
+	token, err := h.authService.LoginByGoogleCallback(r.Context(), state, r.FormValue("code"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(token)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    token.AccessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   15 * 60,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    token.RefreshToken,
+		Path:     "/auth/refresh",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   24 * 60 * 60,
+	})
+
+	http.Redirect(w, r, h.conf.OriginUrl, http.StatusSeeOther)
 }

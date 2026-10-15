@@ -24,6 +24,7 @@ type AuthRepository interface {
 	CheckTokenExist(ctx context.Context, userId string, oldRefreshUUID string) bool
 	BlacklistToken(ctx context.Context, userId string, oldRefreshUUID string) error
 	StoreGoogleOauthState(ctx context.Context, state string) error
+	CheckGoogleOauthStateExist(ctx context.Context, state string) bool
 }
 
 type authRepositoryImpl struct {
@@ -178,4 +179,16 @@ func (a *authRepositoryImpl) StoreGoogleOauthState(ctx context.Context, state st
 		log.Println("Failed to store google oauth state: " + err.Error())
 	}
 	return err
+}
+
+func (a *authRepositoryImpl) CheckGoogleOauthStateExist(ctx context.Context, state string) bool {
+	_, err := a.r.Get(ctx, "google-auth:"+state).Result()
+	if err != nil {
+		return false
+	}
+	err = a.r.Del(ctx, "google-auth:"+state).Err()
+	if err != nil {
+		return false
+	}
+	return true
 }

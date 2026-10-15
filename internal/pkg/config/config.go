@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"sync"
 
@@ -14,6 +15,13 @@ type Config struct {
 	RedisUri          string
 	JwtKey            string
 	GoogleOauthConfig *oauth2.Config
+	OriginUrl         string
+}
+
+type GoogleOAuthCredentials struct {
+	Web struct {
+		JavaScriptOrigins []string `json:"javascript_origins"`
+	} `json:"web"`
 }
 
 var (
@@ -53,12 +61,23 @@ func GetConfig() *Config {
 			googleOauthConfig = oauthConfig
 		}
 
+		var originUrl string
+
+		var credentials GoogleOAuthCredentials
+		err = json.Unmarshal([]byte(googleOauthConfigJson), &credentials)
+		if err == nil {
+			originUrl = credentials.Web.JavaScriptOrigins[0]
+		} else {
+			originUrl = "http://localhost:3000/"
+		}
+
 		config = &Config{
 			MongoURI:          mongoURI,
 			DBName:            dbName,
 			RedisUri:          redisUri,
 			JwtKey:            jwtKey,
 			GoogleOauthConfig: googleOauthConfig,
+			OriginUrl:         originUrl,
 		}
 	})
 

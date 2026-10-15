@@ -25,7 +25,7 @@ type AuthService interface {
 	Register(ctx context.Context, email, password string) (model.Token, error)
 	Refresh(ctx context.Context, refreshToken string) model.Token
 	LoginByGoogle(ctx context.Context) (string, error)
-	LoginByGoogleCallback(ctx context.Context, code string) (model.Token, error)
+	LoginByGoogleCallback(ctx context.Context, state, code string) (model.Token, error)
 }
 
 type authServiceImpl struct {
@@ -274,7 +274,11 @@ func (a *authServiceImpl) LoginByGoogle(ctx context.Context) (string, error) {
 	return u, nil
 }
 
-func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, code string) (model.Token, error) {
+func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, state, code string) (model.Token, error) {
+	if !a.authRepository.CheckGoogleOauthStateExist(ctx, state) {
+		log.Println("Error exchange authorization code to token")
+		return model.Token{}, errors.New("Error getting google auth state")
+	}
 
 	token, err := a.conf.GoogleOauthConfig.Exchange(ctx, code)
 	if err != nil {
