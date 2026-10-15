@@ -55,6 +55,12 @@ func main() {
 			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
 				authHandler.Login(w, r)
 			})
+			r.Get("/login-by-google", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.LoginByGoogle(w, r)
+			})
+			r.Get("/google-oauth-callback", func(w http.ResponseWriter, r *http.Request) {
+				authHandler.LoginByGoogleCallback(w, r)
+			})
 			r.Post("/logout", func(w http.ResponseWriter, r *http.Request) {
 				authHandler.Logout(w, r)
 			})

@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"log"
+	"net/http"
 
 	"minggat-dulu-backend/internal/pkg/config"
 	"minggat-dulu-backend/internal/user/model"
@@ -12,6 +16,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/oauth2"
 )
 
 type AuthService interface {
@@ -19,6 +24,8 @@ type AuthService interface {
 	Logout(ctx context.Context, refreshToken string) error
 	Register(ctx context.Context, email, password string) (model.Token, error)
 	Refresh(ctx context.Context, refreshToken string) model.Token
+	LoginByGoogle(ctx context.Context) (string, error)
+	LoginByGoogleCallback(ctx context.Context, code string) (model.Token, error)
 }
 
 type authServiceImpl struct {
@@ -244,4 +251,119 @@ func (a *authServiceImpl) Logout(ctx context.Context, refreshToken string) error
 	}
 
 	return nil
+}
+
+func (a *authServiceImpl) LoginByGoogle(ctx context.Context) (string, error) {
+	state, err := randomValue(32)
+	if err != nil {
+		return "", err
+	}
+
+	googleOauthConfig := a.conf.GoogleOauthConfig
+
+	if googleOauthConfig == nil {
+		return "", errors.New("Google OAuth is not configured")
+	}
+
+	err = a.authRepository.StoreGoogleOauthState(ctx, state)
+	if err != nil {
+		return "", err
+	}
+
+	u := googleOauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	return u, nil
+}
+
+func (a *authServiceImpl) LoginByGoogleCallback(ctx context.Context, code string) (model.Token, error) {
+
+	token, err := a.conf.GoogleOauthConfig.Exchange(ctx, code)
+	if err != nil {
+		log.Println("Error exchange authorization code to token")
+		return model.Token{}, err
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		"https://openidconnect.googleapis.com/v1/userinfo",
+		nil,
+	)
+	if err != nil {
+		log.Println("Error creating request for google user info")
+		return model.Token{}, err
+	}
+
+	client := a.conf.GoogleOauthConfig.Client(ctx, token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error getting google user info")
+		return model.Token{}, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Println("Error getting google user info")
+		return model.Token{}, errors.New("Error getting google user info")
+	}
+
+	var data bson.M
+	err = json.NewDecoder(resp.Body).Decode(&data)
+	if err != nil {
+		log.Println("Error getting google user info response payload")
+		return model.Token{}, err
+	}
+
+	email := data["email"].(string)
+
+	user := a.userRepository.GetUserByEmail(ctx, email)
+
+	if user == nil {
+		user, err = a.userRepository.CreateOauthUser(ctx, email, "google")
+		if err != nil {
+			return model.Token{}, err
+		}
+	}
+
+	driver, exists := user["driver"]
+	if !exists || driver != "google" {
+		log.Println("Invalid login method")
+		return model.Token{}, errors.New("Invalid email driver")
+	}
+
+	oid, ok := user["_id"].(bson.ObjectID)
+	var userId string
+	if ok {
+		userId = oid.Hex()
+	} else {
+		userId = user["_id"].(string)
+	}
+
+	appToken := a.authRepository.CreateToken(ctx, userId, email, user)
+	if token.AccessToken == "" {
+		log.Println("Error creating token")
+		return model.Token{}, errors.New("Error creating token")
+	}
+
+	if !a.authRepository.StoreToken(ctx, appToken) {
+		log.Println("Error storing token into Redis")
+		return model.Token{}, errors.New("Error storing token")
+	}
+
+	if !a.userRepository.StoreUser(ctx, user) {
+		a.authRepository.DeleteToken(ctx, userId, email)
+		log.Println("Error storing user in Redis")
+		return model.Token{}, errors.New("Error storing user in Redis")
+	}
+
+	return appToken, nil
+}
+
+func randomValue(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }

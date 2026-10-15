@@ -124,3 +124,24 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(bson.M{"message": "Logout successful"})
 }
+
+func (h *AuthHandler) LoginByGoogle(w http.ResponseWriter, r *http.Request) {
+	u, err := h.authService.LoginByGoogle(r.Context())
+	if err != nil {
+		http.Error(w, "Failed to open google login window: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, u, http.StatusTemporaryRedirect)
+}
+
+func (h *AuthHandler) LoginByGoogleCallback(w http.ResponseWriter, r *http.Request) {
+	token, err := h.authService.LoginByGoogleCallback(r.Context(), r.FormValue("code"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(token)
+}

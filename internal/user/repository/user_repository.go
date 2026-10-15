@@ -18,6 +18,7 @@ type UserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) bson.M
 	StoreUser(ctx context.Context, user bson.M) bool
 	CreateUser(ctx context.Context, email, password string) (bson.M, error)
+	CreateOauthUser(ctx context.Context, email, driver string) (bson.M, error)
 }
 
 type UserRepositoryImpl struct {
@@ -89,6 +90,22 @@ func (u *UserRepositoryImpl) CreateUser(ctx context.Context, email, password str
 	user := bson.M{
 		"email":    email,
 		"password": password,
+		"driver":   "basic",
+	}
+	res, err := u.client.Database(u.conf.DBName).Collection("users").InsertOne(ctx, user)
+	if err != nil {
+		log.Println("Error creating new user", err)
+		return nil, err
+	}
+	user["_id"] = res.InsertedID
+
+	return user, nil
+}
+
+func (u *UserRepositoryImpl) CreateOauthUser(ctx context.Context, email, driver string) (bson.M, error) {
+	user := bson.M{
+		"email":  email,
+		"driver": driver,
 	}
 	res, err := u.client.Database(u.conf.DBName).Collection("users").InsertOne(ctx, user)
 	if err != nil {
