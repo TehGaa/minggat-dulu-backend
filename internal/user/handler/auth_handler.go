@@ -6,6 +6,7 @@ import (
 	"minggat-dulu-backend/internal/user/model"
 	"minggat-dulu-backend/internal/user/service"
 	"net/http"
+	"net/url"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -160,12 +161,16 @@ func (h *AuthHandler) LoginByGoogleCallback(w http.ResponseWriter, r *http.Reque
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    token.RefreshToken,
-		Path:     "/auth/refresh",
+		Path:     "/api/v1/auth",
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   24 * 60 * 60,
 	})
 
-	http.Redirect(w, r, h.conf.OriginUrl, http.StatusSeeOther)
+	fragment := url.Values{}
+	fragment.Set("access_token", token.AccessToken)
+	fragment.Set("refresh_token", token.RefreshToken)
+
+	http.Redirect(w, r, h.conf.OriginUrl+"#"+fragment.Encode(), http.StatusSeeOther)
 }
