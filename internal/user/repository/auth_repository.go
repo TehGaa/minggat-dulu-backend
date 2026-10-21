@@ -147,7 +147,6 @@ func (a *authRepositoryImpl) BlacklistToken(ctx context.Context, userId, oldRefr
 
 	if err != nil {
 		log.Println("Error invalid token")
-		return err
 	}
 
 	accessClaims := accessToken.Claims.(jwt.MapClaims)
