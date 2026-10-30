@@ -40,7 +40,7 @@ func GetConfig() *Config {
 		googleOauthConfigJson := os.Getenv("GOOGLE_OAUTH_SECRET")
 		apiKey := os.Getenv("API_KEY")
 		if mongoURI == "" {
-			mongoURI = "mongodb://root:password@localhost:27017"
+			mongoURI = "mongodb://root:rootpassword@localhost:27017"
 		}
 		if dbName == "" {
 			dbName = "minggat_dulu"
