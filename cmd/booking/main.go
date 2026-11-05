@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	customMiddleware "minggat-dulu-backend/internal/pkg/middleware"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -21,6 +23,15 @@ func main() {
 		r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("Booking Service OK"))
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(customMiddleware.AuthMiddleware)
+			r.Use(customMiddleware.ApiMiddleware)
+
+			r.Get("/", func(w http.ResponseWriter, req *http.Request) {
+
+			})
 		})
 	})
 

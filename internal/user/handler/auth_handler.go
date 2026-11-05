@@ -150,7 +150,7 @@ func (h *AuthHandler) LoginByGoogleCallback(w http.ResponseWriter, r *http.Reque
 	}
 
 	callbackURL := strings.TrimRight(h.conf.OriginUrl, "/") +
-		"/api/auth/google/callback?ticket=" + url.QueryEscape(ticket)
+		"/api/auth/google/callback_ticket?ticket=" + url.QueryEscape(ticket)
 
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
